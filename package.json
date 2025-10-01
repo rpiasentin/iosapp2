@@ -12,7 +12,12 @@
     "typecheck": "npm run typecheck --workspace=@inverter/mobile",
     "expo-doctor": "npm run expo-doctor --workspace=@inverter/mobile",
     "detox:build": "npm run detox:build --workspace=@inverter/mobile",
-    "detox:test": "npm run detox:test --workspace=@inverter/mobile"
+    "detox:test": "npm run detox:test --workspace=@inverter/mobile",
+    "dev:check": "node scripts/dev/ensure-api.js",
+    "dev:start": "node scripts/dev/start-expo.js",
+    "dev:ios": "EXPO_START_MODE=local EXPO_LAUNCH_SIMULATOR=true npm run dev:start",
+    "dev:lan": "EXPO_START_MODE=lan npm run dev:start",
+    "dev:tunnel": "EXPO_START_MODE=tunnel EXPO_LAUNCH_SIMULATOR=false npm run dev:start",
+    "api:web": "cd ../inverter-app-api-start && make web"
   }
 }
-
