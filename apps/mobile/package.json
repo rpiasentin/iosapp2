@@ -1,0 +1,30 @@
+{
+  "name": "@inverter/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "echo \"TODO: wire up ESLint\"",
+    "test": "echo \"TODO: add Jest tests\"",
+    "typecheck": "tsc --noEmit",
+    "expo-doctor": "expo-doctor",
+    "detox": "echo \"TODO: configure Detox\"",
+    "detox:build": "echo \"TODO: configure Detox build\"",
+    "detox:test": "echo \"TODO: configure Detox tests\""
+  },
+  "dependencies": {
+    "expo": "~54.0.10",
+    "expo-status-bar": "~3.0.8",
+    "react": "19.1.0",
+    "react-native": "0.81.4"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.2"
+  }
+}
+

@@ -1,0 +1,9 @@
+# Mobile repo code ownership
+# Mobile app directories
+/apps/mobile/ @mobile-team
+/packages/api-client/ @mobile-team @backend-team
+/packages/ui/ @mobile-team
+/docs/ @mobile-team @product-team
+
+# CI workflows
+.github/workflows/ @devops-team
