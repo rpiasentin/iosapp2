@@ -1,0 +1,59 @@
+name: Mobile CI
+
+on:
+  pull_request:
+    branches:
+      - feature/ios-client
+      - main
+  push:
+    branches:
+      - feature/ios-client
+      - main
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+        working-directory: apps/mobile
+      - name: Lint
+        run: yarn lint
+        working-directory: apps/mobile
+      - name: Unit tests
+        run: yarn test --watch=false
+        working-directory: apps/mobile
+      - name: Typecheck
+        run: yarn tsc --noEmit
+        working-directory: apps/mobile
+      - name: Expo Doctor
+        run: npx expo-doctor
+        working-directory: apps/mobile
+
+  detox:
+    needs: build
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+        working-directory: apps/mobile
+      - name: Install AppleSimUtils
+        run: brew tap wix/brew && brew install applesimutils
+      - name: Build iOS app for testing
+        run: yarn detox build --configuration ios.sim.debug
+        working-directory: apps/mobile
+      - name: Run Detox tests
+        env:
+          DETOX_CONFIGURATION: ios.sim.debug
+        run: yarn detox test
+        working-directory: apps/mobile
