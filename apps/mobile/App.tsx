@@ -1,161 +1,80 @@
-import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Linking, StyleSheet } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-import { createApiClient, HealthResponse } from '@inverter/api-client';
+import { DashboardScreen } from './src/screens/DashboardScreen';
+import { NavigationScreen } from './src/screens/NavigationScreen';
+import { PlaceholderScreen } from './src/screens/PlaceholderScreen';
+import { CombinedMathScreen } from './src/screens/CombinedMathScreen';
 
-type HealthState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'success'; data: HealthResponse }
-  | { status: 'error'; error: string };
+const REQUIRED_BASE_URL_MESSAGE =
+  'Missing EXPO_PUBLIC_API_BASE_URL. Add it to app config or .env before running the app.';
 
-function useHealthCheck() {
-  const [state, setState] = useState<HealthState>({ status: 'idle' });
-
-  const api = useMemo(() => {
-    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-    if (!baseUrl) {
-      throw new Error(
-        'Missing EXPO_PUBLIC_API_BASE_URL. Add it to app config or .env before running the app.'
-      );
-    }
-    return createApiClient({ baseUrl });
-  }, []);
-
-  const fetchHealth = () => {
-    setState({ status: 'loading' });
-    api
-      .getHealth()
-      .then((data) => {
-        setState({ status: 'success', data });
-      })
-      .catch((error: unknown) => {
-        const message =
-          error instanceof Error ? error.message : 'Unknown error during health check';
-        setState({ status: 'error', error: message });
-      });
-  };
-
-  useEffect(() => {
-    fetchHealth();
-  }, []);
-
-  return {
-    state,
-    refresh: fetchHealth,
-  };
-}
+type ActiveScreen =
+  | { type: 'nav' }
+  | { type: 'dashboard' }
+  | { type: 'combinedMath' }
+  | { type: 'placeholder'; title: string; description?: string; link?: string };
 
 export default function App() {
-  const { state, refresh } = useHealthCheck();
+  const baseUrl = useMemo(() => {
+    const value = process.env.EXPO_PUBLIC_API_BASE_URL;
+    if (!value) {
+      throw new Error(REQUIRED_BASE_URL_MESSAGE);
+    }
+    return value;
+  }, []);
+
+  const [active, setActive] = useState<ActiveScreen>({ type: 'nav' });
+
+  const handleOpenDashboard = () => setActive({ type: 'dashboard' });
+  const handleOpenCombinedMath = () => setActive({ type: 'combinedMath' });
+  const handleBackToNav = () => setActive({ type: 'nav' });
+  const handlePlaceholder = (options: { title: string; description?: string; link?: string }) =>
+    setActive({ type: 'placeholder', ...options });
+
+  const openLink = async (url: string) => {
+    const target = url.startsWith('http') ? url : `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+    const supported = await Linking.canOpenURL(target);
+    if (supported) {
+      await Linking.openURL(target);
+    }
+  };
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="auto" />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={state.status === 'loading'} onRefresh={refresh} />}
-      >
-        <Text style={styles.title}>API Connectivity</Text>
-        {state.status === 'loading' && <ActivityIndicator size="large" />}
-        {state.status === 'error' && (
-          <View style={styles.cardError}>
-            <Text style={styles.cardTitle}>Health check failed</Text>
-            <Text style={styles.cardBody}>{state.error}</Text>
-          </View>
-        )}
-        {state.status === 'success' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Status: {state.data.status.toUpperCase()}</Text>
-            <View style={styles.cardRow}>
-              <Text style={styles.label}>Serial</Text>
-              <Text style={styles.value}>{state.data.serial ?? '—'}</Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.label}>Samples</Text>
-              <Text style={styles.value}>{state.data.samples.count}</Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.label}>Last Sample</Text>
-              <Text style={styles.value}>{state.data.samples.last_ts ?? '—'}</Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.label}>Sample Age (s)</Text>
-              <Text style={styles.value}>
-                {state.data.samples.age_seconds != null
-                  ? Math.round(state.data.samples.age_seconds)
-                  : '—'}
-              </Text>
-            </View>
-          </View>
-        )}
-      </ScrollView>
-    </View>
+    <SafeAreaProvider>
+      <SafeAreaView edges={['top', 'right', 'left', 'bottom']} style={styles.safeArea}>
+        {active.type === 'nav' ? (
+          <NavigationScreen
+            baseUrl={baseUrl}
+            onOpenDashboard={handleOpenDashboard}
+            onOpenCombinedMath={handleOpenCombinedMath}
+            onShowPlaceholder={handlePlaceholder}
+          />
+        ) : null}
+        {active.type === 'dashboard' ? (
+          <DashboardScreen baseUrl={baseUrl} onBack={handleBackToNav} />
+        ) : null}
+        {active.type === 'combinedMath' ? (
+          <CombinedMathScreen baseUrl={baseUrl} onBack={handleBackToNav} />
+        ) : null}
+        {active.type === 'placeholder' ? (
+          <PlaceholderScreen
+            title={active.title}
+            description={active.description}
+            link={active.link}
+            onBack={handleBackToNav}
+            onOpenLink={openLink}
+          />
+        ) : null}
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#f4f6f8',
-  },
-  content: {
-    padding: 24,
-    alignItems: 'stretch',
-    gap: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardError: {
-    backgroundColor: '#fff4f4',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#f2b6b6',
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 16,
-    color: '#505154',
-  },
-  value: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1f1f21',
-  },
-  cardBody: {
-    fontSize: 16,
-    color: '#1f1f21',
+    backgroundColor: '#f1f5f9',
   },
 });

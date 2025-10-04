@@ -7,6 +7,11 @@ import {
   PvHistoryResponse,
   SchedulerEventsResponse,
   SchedulerStatusResponse,
+  VrmHealthResponse,
+  HistoryKeysResponse,
+  HistoryCustomResponse,
+  VrmCodesResponse,
+  VrmInstancesResponse,
 } from "./types";
 import { resolveBaseUrl, BaseUrlOptions } from "./config";
 
@@ -22,6 +27,22 @@ export interface ApiClientOptions extends BaseUrlOptions {
 export interface RequestOverrides extends Omit<RequestOptions, "method"> {
   readonly headers?: Record<string, string>;
   readonly timeoutMs?: number;
+}
+
+export interface HistoryCustomParams {
+  readonly left: string;
+  readonly right?: string;
+  readonly limit?: number;
+  readonly windowHours?: number;
+}
+
+export interface VrmHistoryParams {
+  readonly left: string;
+  readonly right?: string;
+  readonly limit?: number;
+  readonly windowHours?: number;
+  readonly leftInstance?: number;
+  readonly rightInstance?: number;
 }
 
 function ensureFetch(fetchFn?: FetchFunction): FetchFunction {
@@ -137,6 +158,78 @@ export class ApiClient {
     });
   }
 
+  /** GET /api/victron/health */
+  public getVrmHealth(options?: RequestOverrides): Promise<VrmHealthResponse> {
+    return this.request<VrmHealthResponse>("/api/victron/health", options);
+  }
+
+  /** GET /api/history/keys */
+  public getHistoryKeys(options?: RequestOverrides): Promise<HistoryKeysResponse> {
+    return this.request<HistoryKeysResponse>("/api/history/keys", options);
+  }
+
+  /** GET /api/history/custom */
+  public getHistoryCustom(
+    params: HistoryCustomParams,
+    options?: RequestOverrides
+  ): Promise<HistoryCustomResponse> {
+    const { left, right, limit, windowHours } = params;
+    return this.request<HistoryCustomResponse>("/api/history/custom", {
+      ...options,
+      query: {
+        ...(options?.query ?? {}),
+        left,
+        right: right ?? left,
+        ...(typeof limit === "number" ? { limit } : {}),
+        ...(typeof windowHours === "number" ? { window_hours: windowHours } : {}),
+      },
+    });
+  }
+
+  /** GET /api/victron/history/codes */
+  public getVrmHistoryCodes(options?: RequestOverrides): Promise<VrmCodesResponse> {
+    return this.request<VrmCodesResponse>("/api/victron/history/codes", options);
+  }
+
+  /** GET /api/victron/devices/instances */
+  public getVrmInstances(options?: RequestOverrides): Promise<VrmInstancesResponse> {
+    return this.request<VrmInstancesResponse>("/api/victron/devices/instances", options);
+  }
+
+  /** GET /api/victron/devices/instance-codes */
+  public getVrmInstanceCodes(
+    instance: number,
+    options?: RequestOverrides
+  ): Promise<VrmCodesResponse> {
+    return this.request<VrmCodesResponse>("/api/victron/devices/instance-codes", {
+      ...options,
+      query: {
+        ...(options?.query ?? {}),
+        instance,
+      },
+    });
+  }
+
+  /** GET /api/victron/history/custom-by-code */
+  public getVrmHistoryByCode(
+    params: VrmHistoryParams,
+    options?: RequestOverrides
+  ): Promise<HistoryCustomResponse> {
+    const { left, right, limit, windowHours, leftInstance, rightInstance } = params;
+    return this.request<HistoryCustomResponse>("/api/victron/history/custom-by-code", {
+      ...options,
+      query: {
+        ...(options?.query ?? {}),
+        left,
+        right: right ?? left,
+        ...(typeof limit === "number" ? { limit } : {}),
+        ...(typeof windowHours === "number" ? { window_hours: windowHours } : {}),
+        ...(typeof leftInstance === "number" ? { linst: leftInstance } : {}),
+        ...(typeof rightInstance === "number" ? { rinst: rightInstance } : {}),
+      },
+    });
+  }
+
   /** Basic helper to validate connectivity; throws if the endpoint is unreachable. */
   public async ping(): Promise<HealthResponse> {
     try {
@@ -156,3 +249,4 @@ export class ApiClient {
 export function createApiClient(options?: ApiClientOptions): ApiClient {
   return new ApiClient(options);
 }
+
