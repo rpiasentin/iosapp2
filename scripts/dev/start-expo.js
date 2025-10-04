@@ -50,7 +50,21 @@ function getConfig() {
   };
 }
 
+function ensureExpoDependencies() {
+  console.log("[deps] Checking Expo-managed package versions...");
+  const exe = process.platform === "win32" ? "npx.cmd" : "npx";
+  const result = spawnSync(exe, ["expo", "install", "--check"], {
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
+  if (result.status !== 0) {
+    console.error("[deps] Expo dependency check failed. Fix the versions above and rerun the command you attempted.");
+    process.exit(result.status ?? 1);
+  }
+}
+
 function runChecks() {
+  ensureExpoDependencies();
   const commands = [
     ["run", "typecheck", "--workspace", "@inverter/mobile"],
     ["run", "typecheck", "--workspace", "@inverter/api-client"],

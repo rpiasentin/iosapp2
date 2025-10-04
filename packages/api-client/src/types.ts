@@ -54,6 +54,45 @@ export interface SchedulerEventsResponse {
   readonly events: ReadonlyArray<SchedulerEvent>;
 }
 
+export interface VrmHealthResponse {
+  readonly configured: boolean;
+  readonly system_id?: string | null;
+  readonly samples: {
+    readonly count: number;
+    readonly last_ts: string | null;
+  };
+}
+
+export interface HistoryKeysResponse {
+  readonly keys: ReadonlyArray<string>;
+}
+
+export interface HistoryPoint {
+  readonly ts: string | null;
+  readonly left: number | null;
+  readonly right: number | null;
+}
+
+export interface HistoryCustomResponse {
+  readonly points: ReadonlyArray<HistoryPoint>;
+}
+
+export interface VrmCodesResponse {
+  readonly codes: ReadonlyArray<string>;
+}
+
+export interface VrmInstanceItem {
+  readonly instance: number;
+  readonly idDeviceType?: number | string | null;
+  readonly name?: string | null;
+  readonly productName?: string | null;
+  readonly productCode?: string | null;
+}
+
+export interface VrmInstancesResponse {
+  readonly items: ReadonlyArray<VrmInstanceItem>;
+}
+
 export interface ChangeLogEntry {
   readonly id?: number;
   readonly ts?: string;

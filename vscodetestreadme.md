@@ -64,14 +64,20 @@ All commands in this section run from the macOS **Terminal** application.
    ```
    This should complete without engine warnings now that Node 20 is active.
 
-5. Copy the environment template and set the FastAPI base URL you plan to target:
+5. Verify Expo-managed dependencies match the SDK manifest:
+   ```bash
+   npx expo install --check
+   ```
+   This cmd reassures Expo that packages such as `react-native-safe-area-context` and `react-native-svg` stay aligned with the current SDK before Metro starts.
+
+6. Copy the environment template and set the FastAPI base URL you plan to target:
    ```bash
    cp .env.example .env
    # edit .env to point EXPO_PUBLIC_API_BASE_URL at your backend
    ```
    Adjust `EXPO_START_MODE`, `EXPO_DEV_PORT`, and `EXPO_LAUNCH_SIMULATOR` as desired; these control how the Expo starter script runs (LAN/localhost/tunnel and whether to auto-open the simulator). Any key that starts with `EXPO_PUBLIC_` is automatically injected into the Expo bundle; keep this terminal open so the variable remains in scope.
 
-6. Optionally keep the FastAPI backend handy. From this repo you can start it with:
+7. Optionally keep the FastAPI backend handy. From this repo you can start it with:
    ```bash
    npm run api:web
    ```
@@ -89,7 +95,7 @@ All commands in this section run from the macOS **Terminal** application.
    ```bash
    npm run dev:start
    ```
-   The script runs the TypeScript checks for the mobile app and API client, verifies the backend via `dev:check`, then reads `.env` to decide how to launch Expo. With the defaults (`EXPO_START_MODE=lan`, `EXPO_LAUNCH_SIMULATOR=true`) the simulator opens automatically while LAN mode keeps the bundle reachable from phones on the same Wi-Fi.
+   The script runs the TypeScript checks for the mobile app and API client, verifies Expo-managed dependencies (`npx expo install --check`), confirms the backend via `dev:check`, then reads `.env` to decide how to launch Expo. With the defaults (`EXPO_START_MODE=lan`, `EXPO_LAUNCH_SIMULATOR=true`) the simulator opens automatically while LAN mode keeps the bundle reachable from phones on the same Wi-Fi.
 
 3. **Hot reload check**
    - Edit `apps/mobile/App.tsx` (e.g., change the displayed text) and save.
