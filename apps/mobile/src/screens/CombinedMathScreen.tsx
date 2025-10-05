@@ -8,7 +8,9 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   createApiClient,
@@ -26,6 +28,8 @@ import {
   formatNumber,
   formatRelativeTime,
 } from '../utils/format';
+
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 const COLUMN_COLORS = ['#1d4ed8', '#ec4899', '#22c55e', '#f97316'];
 const SUM_COLOR = '#7c3aed';
@@ -281,6 +285,8 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
   const [vrmInstances, setVrmInstances] = useState<VrmInstanceItem[]>([]);
   const [modalState, setModalState] = useState<ModalState | null>(null);
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'idle', series: [] });
+  const [fullscreenVisible, setFullscreenVisible] = useState(false);
+  const windowDimensions = useWindowDimensions();
 
   const loadOptions = useCallback(async () => {
     try {
@@ -324,6 +330,44 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
 
   const handleToggleCalc = useCallback((idx: number) => {
     setCalcIncludes((prev) => prev.map((value, index) => (index === idx ? !value : value)));
+  }, []);
+
+  const hasSeries = fetchState.series.length > 0;
+  const fullscreenChartHeight = Math.max(320, windowDimensions.height - 200);
+  const insets = useSafeAreaInsets();
+
+  const lockOrientation = useCallback(async (lock: ScreenOrientation.OrientationLock) => {
+    try {
+      await ScreenOrientation.lockAsync(lock);
+    } catch (error) {
+      console.warn('[orientation] lock failed', error);
+    }
+  }, []);
+
+  const openFullscreen = useCallback(() => {
+    if (!hasSeries) {
+      return;
+    }
+    setFullscreenVisible(true);
+  }, [hasSeries]);
+
+  const closeFullscreen = useCallback(() => {
+    setFullscreenVisible(false);
+    lockOrientation(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  }, [lockOrientation]);
+
+  const handlePortrait = useCallback(() => {
+    lockOrientation(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  }, [lockOrientation]);
+
+  const handleLandscape = useCallback(() => {
+    lockOrientation(ScreenOrientation.OrientationLock.LANDSCAPE);
+  }, [lockOrientation]);
+
+  useEffect(() => {
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
+    };
   }, []);
 
   const openKpiModal = useCallback(
@@ -577,7 +621,19 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
         </Section>
 
         <Section title="Graph">
-          <LineChart series={fetchState.series} />
+          <Pressable
+            style={[styles.chartPressable, !hasSeries ? styles.chartPressableDisabled : null]}
+            onPress={openFullscreen}
+            disabled={!hasSeries}
+            accessibilityRole="button"
+          >
+            <LineChart series={fetchState.series} />
+            {hasSeries ? (
+              <View style={styles.chartHint} pointerEvents="none">
+                <Text style={styles.chartHintText}>Tap to expand</Text>
+              </View>
+            ) : null}
+          </Pressable>
           {legendItems.length ? (
             <View style={styles.legendRow}>
               {legendItems.map((item) => (
@@ -615,6 +671,49 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
           </Card>
         </Section>
       </ScrollView>
+      <Modal
+        visible={fullscreenVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={closeFullscreen}
+      >
+        <SafeAreaView
+          style={[
+            styles.fullscreenContainer,
+            { paddingTop: (insets.top || 16), paddingBottom: (insets.bottom || 24) },
+          ]}
+          edges={['right', 'left']}
+        >
+          <View style={styles.fullscreenHeader}>
+            <Pressable
+              style={[styles.fullscreenButton, styles.fullscreenClose]}
+              onPress={closeFullscreen}
+              accessibilityRole="button"
+            >
+              <Text style={styles.fullscreenButtonText}>Close</Text>
+            </Pressable>
+            <View style={styles.fullscreenActions}>
+              <Pressable
+                style={styles.fullscreenButton}
+                onPress={handlePortrait}
+                accessibilityRole="button"
+              >
+                <Text style={styles.fullscreenButtonText}>Portrait</Text>
+              </Pressable>
+              <Pressable
+                style={styles.fullscreenButton}
+                onPress={handleLandscape}
+                accessibilityRole="button"
+              >
+                <Text style={styles.fullscreenButtonText}>Landscape</Text>
+              </Pressable>
+            </View>
+          </View>
+          <View style={styles.fullscreenBody}>
+            <LineChart series={fetchState.series} height={fullscreenChartHeight} />
+          </View>
+        </SafeAreaView>
+      </Modal>
       <OptionModal state={modalState} onClose={() => setModalState(null)} />
     </View>
   );
@@ -854,6 +953,66 @@ const styles = StyleSheet.create({
   modalCancelText: {
     color: '#0f172a',
     fontWeight: '600',
+  },
+  chartPressable: {
+    position: 'relative',
+  },
+  chartPressableDisabled: {
+    opacity: 0.5,
+  },
+  chartHint: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(15,23,42,0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  chartHintText: {
+    color: '#ffffff',
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+  fullscreenContainer: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+  },
+  fullscreenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    paddingTop: 8,
+  },
+  fullscreenActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  fullscreenButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15,23,42,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  fullscreenClose: {
+    backgroundColor: '#f87171',
+    borderColor: '#7f1d1d',
+  },
+  fullscreenButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    letterSpacing: 0.6,
+  },
+  fullscreenBody: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    justifyContent: 'center',
   },
 });
 

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
-import Svg, { G, Line, Path, Rect } from 'react-native-svg';
+import Svg, { G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 export interface ChartPoint {
   readonly ts: number;
@@ -93,11 +93,27 @@ export function LineChart({ series, height = 260 }: LineChartProps) {
   }
 
   const { width, chartWidth, chartHeight, min, max } = info;
+  const timeValues = timeline
+    .map((pt) => pt.ts)
+    .filter((ts): ts is number => typeof ts === 'number' && !Number.isNaN(ts));
+  const minTime = timeValues.length ? Math.min(...timeValues) : Date.now();
+  const maxTime = timeValues.length ? Math.max(...timeValues) : Date.now();
+  const midTime = minTime + (maxTime - minTime) / 2;
+  const formatTimeLabel = (time: number) =>
+    new Date(time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
   const marginX = (width - chartWidth) / 2;
   const marginY = (height - chartHeight) / 2;
   const horizontalLines = 4;
   const stepY = chartHeight / horizontalLines;
-  const labels = [max, min];
+  const yTicks = Array.from({ length: horizontalLines + 1 }, (_, idx) =>
+    max - ((max - min) * idx) / horizontalLines,
+  );
+  const xTicks: Array<{ time: number; position: number }> = [
+    { time: minTime, position: marginX },
+    { time: midTime, position: marginX + chartWidth / 2 },
+    { time: maxTime, position: marginX + chartWidth },
+  ];
 
   return (
     <View style={[styles.container, { height }]}> 
@@ -115,7 +131,7 @@ export function LineChart({ series, height = 260 }: LineChartProps) {
           />
           {Array.from({ length: horizontalLines + 1 }).map((_, idx) => (
             <Line
-              key={idx}
+              key={`grid-${idx}`}
               x1={marginX}
               y1={marginY + idx * stepY}
               x2={marginX + chartWidth}
@@ -124,6 +140,46 @@ export function LineChart({ series, height = 260 }: LineChartProps) {
               strokeDasharray="4 4"
               strokeWidth={1}
             />
+          ))}
+          <Line
+            x1={marginX}
+            y1={marginY}
+            x2={marginX}
+            y2={marginY + chartHeight}
+            stroke="#94a3b8"
+            strokeWidth={1}
+          />
+          <Line
+            x1={marginX}
+            y1={marginY + chartHeight}
+            x2={marginX + chartWidth}
+            y2={marginY + chartHeight}
+            stroke="#94a3b8"
+            strokeWidth={1}
+          />
+          {yTicks.map((tick, idx) => (
+            <SvgText
+              key={`y-${idx}`}
+              x={marginX - 8}
+              y={marginY + idx * stepY + 4}
+              fontSize={10}
+              fill="#475569"
+              textAnchor="end"
+            >
+              {tick.toFixed(2)}
+            </SvgText>
+          ))}
+          {xTicks.map((tick, idx) => (
+            <SvgText
+              key={`x-${idx}`}
+              x={tick.position}
+              y={marginY + chartHeight + 16}
+              fontSize={10}
+              fill="#475569"
+              textAnchor={idx === 0 ? 'start' : idx === xTicks.length - 1 ? 'end' : 'middle'}
+            >
+              {formatTimeLabel(tick.time)}
+            </SvgText>
           ))}
           {series.map((s) => {
             const path = buildPath(s.points, chartWidth, chartHeight, min, max);
@@ -143,10 +199,6 @@ export function LineChart({ series, height = 260 }: LineChartProps) {
           })}
         </G>
       </Svg>
-      <View style={styles.rangeRow}>
-        <Text style={styles.rangeLabel}>Max {max.toFixed(2)}</Text>
-        <Text style={styles.rangeLabel}>Min {min.toFixed(2)}</Text>
-      </View>
     </View>
   );
 }
