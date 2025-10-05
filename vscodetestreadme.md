@@ -77,11 +77,11 @@ All commands in this section run from the macOS **Terminal** application.
    ```
    Adjust `EXPO_START_MODE`, `EXPO_DEV_PORT`, and `EXPO_LAUNCH_SIMULATOR` as desired; these control how the Expo starter script runs (LAN/localhost/tunnel and whether to auto-open the simulator). Any key that starts with `EXPO_PUBLIC_` is automatically injected into the Expo bundle; keep this terminal open so the variable remains in scope.
 
-7. Optionally keep the FastAPI backend handy. From this repo you can start it with:
+7. For day-to-day work it is easiest to let the mobile repo start the backend for you. Use `npm run dev:start:all` (documented below) to boot the FastAPI repo and Metro together. If you prefer to run the backend manually, you can still start it with:
    ```bash
    npm run api:web
    ```
-   That command shells into `../inverter-app-api-start` and runs `make web`. Leave it running before launching the mobile app.
+   That command shells into `../inverter-app-api-start` and runs `make web`.
 
 ## 4. Verifying the Environment
 
@@ -91,11 +91,11 @@ All commands in this section run from the macOS **Terminal** application.
    ```
    Ensure it reports success before continuing.
 
-2. **Launch the Expo dev server (runs type-checks + backend check automatically)**
+2. **Launch the Expo dev server (auto-starts backend, runs preflight checks)**
    ```bash
-   npm run dev:start
+   npm run dev:start:all
    ```
-   The script runs the TypeScript checks for the mobile app and API client, verifies Expo-managed dependencies (`npx expo install --check`), confirms the backend via `dev:check`, then reads `.env` to decide how to launch Expo. With the defaults (`EXPO_START_MODE=lan`, `EXPO_LAUNCH_SIMULATOR=true`) the simulator opens automatically while LAN mode keeps the bundle reachable from phones on the same Wi-Fi.
+   The script runs the TypeScript checks for the mobile app and API client, verifies Expo-managed dependencies (`npx expo install --check`), confirms the backend via `dev:check`, auto-starts the FastAPI repo if it is present, then reads `.env` to decide how to launch Expo. With the defaults (`EXPO_START_MODE=lan`, `EXPO_LAUNCH_SIMULATOR=true`) the simulator opens automatically while LAN mode keeps the bundle reachable from phones on the same Wi-Fi.
 
 3. **Hot reload check**
    - Edit `apps/mobile/App.tsx` (e.g., change the displayed text) and save.
@@ -104,11 +104,11 @@ All commands in this section run from the macOS **Terminal** application.
 ## 5. Running on a Physical Device
 
 1. Install **Expo Go** from the App Store (iOS) or Google Play (Android).
-2. If the current Expo session is localhost-only, stop it (`Ctrl+C`) and restart in LAN or tunnel mode by overriding the environment for the command:
+2. If the current Expo session is localhost-only, stop it (`Ctrl+C`) and restart in LAN or tunnel mode by overriding the environment for the combined start command:
    ```bash
-   EXPO_START_MODE=lan npm run dev:start        # LAN mode
-   EXPO_START_MODE=tunnel npm run dev:start     # Expo tunnel (most compatible across networks)
-   EXPO_START_MODE=local npm run dev:start      # Localhost (simulator-only)
+   EXPO_START_MODE=lan npm run dev:start:all        # LAN mode
+   EXPO_START_MODE=tunnel npm run dev:start:all     # Expo tunnel (most compatible across networks)
+   EXPO_START_MODE=local npm run dev:start:all      # Localhost (simulator-only)
    ```
 3. In the Expo CLI UI, scan the QR code with Expo Go (or type the URL manually). In LAN mode the URL will resemble `exp://<your-mac-ip>:<port>`; in tunnel mode it will be `exp://exp.host/...`.
 4. The app should load the same screen you see in the simulator. If connection fails:
@@ -121,16 +121,16 @@ All commands in this section run from the macOS **Terminal** application.
 - Keep the Expo CLI terminal running to provide fast hot reloads.
 - Run `npm run typecheck --workspace @inverter/mobile` after significant changes or before commits.
 - When updating dependencies, run `npm install`, restart Expo (`Ctrl+C`, rerun the start command), and retest both simulator and Expo Go flows.
-- If Metro reports it “could not connect to the server,” adjust `EXPO_START_MODE` and rerun `npm run dev:start`.
+- If Metro reports it “could not connect to the server,” adjust `EXPO_START_MODE` and rerun `npm run dev:start:all` (or `npm run dev:start` if you already have the backend running).
 
 ## 7. Troubleshooting Quick Reference
 
 | Symptom | Resolution |
 | --- | --- |
 | `npm install` reports Node engine mismatch | Ensure `node -v` prints ≥ 20.19.x, then re-run `npm install`. |
-| Simulator shows “Could not connect to the server” | Set `EXPO_START_MODE=local` and rerun `npm run dev:start`, then press `i` if the simulator does not auto-open. |
-| Device cannot connect to Expo | Run with `EXPO_START_MODE=tunnel npm run dev:start`, ensure backend uses a reachable IP (not localhost). |
-| Metro stuck on old port | Change `EXPO_DEV_PORT` in `.env` and rerun `npm run dev:start`. |
+| Simulator shows “Could not connect to the server” | Set `EXPO_START_MODE=local` and rerun `npm run dev:start:all` (or `npm run dev:start` if the backend is already running), then press `i` if the simulator does not auto-open. |
+| Device cannot connect to Expo | Run with `EXPO_START_MODE=tunnel npm run dev:start:all`, ensure the backend uses a reachable IP (not localhost). |
+| Metro stuck on old port | Change `EXPO_DEV_PORT` in `.env` and rerun `npm run dev:start:all`. |
 | Type checker fails | Fix TypeScript errors reported by `npm run typecheck --workspace @inverter/mobile`. |
 
 Keep this document updated as new tooling or scripts are added to the project. It should remain the single source of truth for reproducing the mobile test environment on any VS Code-equipped Mac.

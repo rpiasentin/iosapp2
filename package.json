@@ -18,6 +18,7 @@
     "dev:ios": "EXPO_START_MODE=local EXPO_LAUNCH_SIMULATOR=true npm run dev:start",
     "dev:lan": "EXPO_START_MODE=lan npm run dev:start",
     "dev:tunnel": "EXPO_START_MODE=tunnel EXPO_LAUNCH_SIMULATOR=false npm run dev:start",
+    "dev:start:all": "node scripts/dev/start-all.js",
     "api:web": "cd ../inverter-app-api-start && make web"
   }
 }

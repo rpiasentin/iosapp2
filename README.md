@@ -14,7 +14,7 @@ This Expo-managed React Native workspace hosts the inverter mobile client alongs
 - **Combined Math editor** lets users configure up to four KPIs across EG4/VRM plus a calculated sum column, adjust scaling per series, and preview data with a new `LineChart` component.
 - **Full-screen graph** – tapping the chart opens a modal that honours safe areas (no overlap with camera islands) and exposes Portrait/Landscape orientation toggles via `expo-screen-orientation`.
 - **Shared formatting** utilities normalise numeric and temporal values for consistent rendering across cards and charts.
-- **Start script preflight** runs `npx expo install --check`, TypeScript checks for both workspaces, and backend availability checks before starting Metro.
+- **Start script preflight** runs `npx expo install --check`, TypeScript checks for both workspaces, and backend availability checks before starting Metro. Use `npm run dev:start:all` to perform the preflight, auto-start the sibling FastAPI repo when it's available, and then launch Metro.
 
 ## Architectural Notes
 
@@ -39,7 +39,10 @@ npm install
 # ensure Expo-managed packages match the SDK manifest
 npx expo install --check
 
-# launch Expo (typechecks both workspaces + sanity checks the backend)
+# start backend + Expo (runs preflight, auto-starts FastAPI, launches Metro)
+npm run dev:start:all
+
+# launch Expo only (assumes backend already running)
 npm run dev:start
 ```
 
