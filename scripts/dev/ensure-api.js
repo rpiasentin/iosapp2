@@ -3,6 +3,8 @@
 
 const fs = require("fs");
 const path = require("path");
+const { spawn } = require("child_process");
+const readline = require("readline");
 const { setTimeout: sleep } = require("timers/promises");
 
 function parseEnvFile(filePath) {
@@ -104,6 +106,141 @@ function ensureLocalExpoEnv(baseUrl) {
   }
 }
 
+async function waitForHealth(baseUrl, attempts, delayMs) {
+  for (let i = 1; i <= attempts; i += 1) {
+    try {
+      await checkHealth(baseUrl);
+      return true;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.warn(`[api-check] Attempt ${i}/${attempts} failed -> ${reason}`);
+      if (i < attempts) {
+        await sleep(delayMs);
+      }
+    }
+  }
+  return false;
+}
+
+function hasSiblingRepo(siblingPath) {
+  try {
+    return fs.existsSync(siblingPath);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function parseBooleanFlag(value) {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "y" ||
+    normalized === "on"
+  );
+}
+
+function isInteractive() {
+  return Boolean(
+    process.stdin.isTTY &&
+      process.stdout.isTTY &&
+      !parseBooleanFlag(process.env.CI) &&
+      !parseBooleanFlag(process.env.EXPO_NON_INTERACTIVE)
+  );
+}
+
+async function promptForStart() {
+  if (!isInteractive()) {
+    return false;
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const question = () =>
+    new Promise((resolve) => {
+      rl.question("[api-check] Start FastAPI backend now? (y/N) ", (answer) => {
+        resolve(parseBooleanFlag(answer));
+      });
+    });
+
+  const result = await question();
+  rl.close();
+  return result;
+}
+
+async function startBackendProcess() {
+  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+  return await new Promise((resolve) => {
+    try {
+      const child = spawn(npmCmd, ["run", "api:web"], {
+        cwd: process.cwd(),
+        stdio: "ignore",
+        detached: true,
+        shell: process.platform === "win32",
+      });
+
+      let settled = false;
+      let timeout;
+
+      const finish = (value) => {
+        if (!settled) {
+          settled = true;
+          if (timeout) {
+            clearTimeout(timeout);
+          }
+          resolve(value);
+        }
+      };
+
+      timeout = setTimeout(() => {
+        finish(true);
+      }, 1000);
+
+      child.on("error", (error) => {
+        console.error(
+          `[api-check] Failed to launch backend: ${error instanceof Error ? error.message : String(error)}`
+        );
+        finish(false);
+      });
+
+      child.on("exit", (code) => {
+        const label = code === null ? "unknown" : code;
+        console.error(`[api-check] Backend process exited early with code ${label}.`);
+        finish(false);
+      });
+
+      child.unref();
+    } catch (error) {
+      console.error(
+        `[api-check] Failed to launch backend: ${error instanceof Error ? error.message : String(error)}`
+      );
+      resolve(false);
+    }
+  });
+}
+
+function printManualInstructions(siblingPath) {
+  console.error(
+    `\n[api-check] Unable to reach FastAPI backend. Start it manually from ${path.relative(
+      process.cwd(),
+      siblingPath
+    )} with: npm run api:web`
+  );
+  console.error(
+    "[api-check] Once the server is running, log into both EG4 and Victron instances and ensure polling succeeds before re-running this command."
+  );
+  console.error(
+    "[api-check] Tip: export EXPO_AUTO_START_API=true to skip the prompt and auto-start the backend during future runs."
+  );
+}
+
 async function main() {
   const baseUrl = resolveBaseUrl();
   if (!baseUrl) {
@@ -116,36 +253,51 @@ async function main() {
   ensureLocalExpoEnv(baseUrl);
 
   const siblingApiRepo = path.resolve(process.cwd(), "../inverter-app-api-start");
-  const hasApiRepo = fs.existsSync(siblingApiRepo);
 
-  const attempts = 2;
-  for (let i = 1; i <= attempts; i += 1) {
-    try {
-      await checkHealth(baseUrl);
-      console.log(`[api-check] Backend reachable at ${baseUrl}`);
-      return;
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      console.warn(`[api-check] Attempt ${i}/${attempts} failed -> ${reason}`);
-      if (i < attempts) {
-        await sleep(500);
-      }
-    }
+  const initialReady = await waitForHealth(baseUrl, 2, 500);
+  if (initialReady) {
+    console.log(`[api-check] Backend reachable at ${baseUrl}`);
+    return;
   }
 
   console.error(`\n[api-check] Unable to reach FastAPI backend at ${baseUrl}.`);
-  if (hasApiRepo) {
-    console.error(
-      `[api-check] Start it with: (cd ${path.relative(
-        process.cwd(),
-        siblingApiRepo
-      )} && make web)`
-    );
+
+  if (!hasSiblingRepo(siblingApiRepo)) {
+    printManualInstructions(siblingApiRepo);
+    process.exit(1);
   }
-  console.error(
-    "[api-check] Once the server is running, re-run the command you attempted (e.g., npm run dev:ios)."
+
+  const autoStart = parseBooleanFlag(process.env.EXPO_AUTO_START_API);
+  const shouldStart = autoStart || (await promptForStart());
+
+  if (!shouldStart) {
+    printManualInstructions(siblingApiRepo);
+    process.exit(1);
+  }
+
+  console.log("[api-check] Starting FastAPI backend via npm run api:web…");
+  const launched = await startBackendProcess();
+  if (!launched) {
+    printManualInstructions(siblingApiRepo);
+    process.exit(1);
+  }
+
+  console.log(
+    "[api-check] Backend launching in the background. Run npm run api:web manually if you need to inspect logs."
   );
-  process.exit(1);
+
+  console.log("[api-check] Waiting for backend to become healthy…");
+  const started = await waitForHealth(baseUrl, 20, 1500);
+  if (!started) {
+    console.error("[api-check] Backend did not become healthy in time.");
+    printManualInstructions(siblingApiRepo);
+    process.exit(1);
+  }
+
+  console.log(`[api-check] Backend reachable at ${baseUrl}`);
+  console.log(
+    "[api-check] Reminder: log into both FastAPI web UI and the mobile client to confirm EG4 and Victron polling succeeds."
+  );
 }
 
 main().catch((error) => {
