@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
@@ -280,6 +281,7 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
   const [columns, setColumns] = useState<ColumnSelection[]>(DEFAULT_COLUMNS);
   const [calcIncludes, setCalcIncludes] = useState<boolean[]>([true, true, false, false]);
   const [windowHours, setWindowHours] = useState<number>(24);
+  const [windowHoursInput, setWindowHoursInput] = useState<string>('24');
   const [eg4Keys, setEg4Keys] = useState<string[]>([]);
   const [vrmCodes, setVrmCodes] = useState<string[]>([]);
   const [vrmInstances, setVrmInstances] = useState<VrmInstanceItem[]>([]);
@@ -321,6 +323,10 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
     loadOptions();
   }, [loadOptions]);
 
+  useEffect(() => {
+    setWindowHoursInput(String(windowHours));
+  }, [windowHours]);
+
   const handleChangeColumn = useCallback(
     (index: number, next: ColumnSelection) => {
       setColumns((prev) => prev.map((col, idx) => (idx === index ? next : col)));
@@ -361,7 +367,7 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
   }, [lockOrientation]);
 
   const handleLandscape = useCallback(() => {
-    lockOrientation(ScreenOrientation.OrientationLock.LANDSCAPE);
+    lockOrientation(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
   }, [lockOrientation]);
 
   useEffect(() => {
@@ -495,9 +501,22 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
 
       const sorted = Array.from(pointMap.values()).sort((a, b) => a.time - b.time);
 
+      const lastValues = columns.map<null | number>(() => null);
+      sorted.forEach((entry) => {
+        const filled = entry.values.map((value, idx) => {
+          if (value === null || Number.isNaN(value)) {
+            const fallback = lastValues[idx];
+            return fallback ?? null;
+          }
+          lastValues[idx] = value;
+          return value;
+        });
+        entry.values = filled;
+      });
+
       const chartSeries: ChartSeries[] = columns.map((column, index) => ({
         id: `column-${index}`,
-        name: column.kpi ? `Col ${index + 1}: ${column.source.toUpperCase()} ${column.kpi}` : `Col ${index + 1}`,
+        name: column.kpi ?? `Column ${index + 1}`,
         color: COLUMN_COLORS[index],
         points: sorted.map((entry) => ({
           ts: entry.time,
@@ -543,6 +562,36 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
     return fetchState.series.map((s) => ({ id: s.id, name: s.name, color: s.color }));
   }, [fetchState.series]);
 
+  const handleWindowInputChange = useCallback((value: string) => {
+    const normalized = value.replace(/[^0-9]/g, '');
+    setWindowHoursInput(normalized);
+  }, []);
+
+  const parsedWindowInput = useMemo(() => {
+    if (!windowHoursInput) {
+      return null;
+    }
+    const parsed = Number.parseInt(windowHoursInput, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return null;
+    }
+    return parsed;
+  }, [windowHoursInput]);
+
+  const applyCustomWindow = useCallback(() => {
+    if (!parsedWindowInput) {
+      setWindowHoursInput(String(windowHours));
+      Keyboard.dismiss();
+      return;
+    }
+    if (parsedWindowInput === windowHours) {
+      Keyboard.dismiss();
+      return;
+    }
+    setWindowHours(parsedWindowInput);
+    Keyboard.dismiss();
+  }, [parsedWindowInput, windowHours]);
+
   return (
     <View style={styles.screen}>
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
@@ -579,15 +628,42 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
 
         <Section title="Window" subtitle="Select the time window for the preview graph.">
           <Card>
-            <View style={styles.windowRow}>
-              {WINDOW_OPTIONS.map((option) => (
-                <ToggleChip
-                  key={option}
-                  label={`${option}h`}
-                  active={windowHours === option}
-                  onPress={() => setWindowHours(option)}
+            <View style={styles.windowControls}>
+              <View style={styles.windowRow}>
+                {WINDOW_OPTIONS.map((option) => (
+                  <ToggleChip
+                    key={option}
+                    label={`${option}h`}
+                    active={windowHours === option}
+                    onPress={() => setWindowHours(option)}
+                  />
+                ))}
+              </View>
+              <View style={styles.windowCustomRow}>
+                <Text style={styles.windowCustomLabel}>Custom hours</Text>
+                <TextInput
+                  style={styles.windowInput}
+                  value={windowHoursInput}
+                  onChangeText={handleWindowInputChange}
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                  onSubmitEditing={applyCustomWindow}
+                  onBlur={applyCustomWindow}
+                  accessibilityLabel="Custom hours window"
+                  placeholder="e.g. 36"
                 />
-              ))}
+                <Pressable
+                  style={[
+                    styles.windowApplyButton,
+                    (!parsedWindowInput || parsedWindowInput === windowHours) && styles.windowApplyButtonDisabled,
+                  ]}
+                  onPress={applyCustomWindow}
+                  disabled={!parsedWindowInput || parsedWindowInput === windowHours}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.windowApplyButtonText}>Apply</Text>
+                </Pressable>
+              </View>
             </View>
             <Text style={styles.windowMeta}>Preview uses data from the selected window with 1-minute samples when available.</Text>
           </Card>
@@ -710,7 +786,11 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
             </View>
           </View>
           <View style={styles.fullscreenBody}>
-            <LineChart series={fetchState.series} height={fullscreenChartHeight} />
+            <LineChart
+              series={fetchState.series}
+              height={fullscreenChartHeight}
+              interactive
+            />
           </View>
         </SafeAreaView>
       </Modal>
@@ -833,10 +913,47 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: '#ffffff',
   },
+  windowControls: {
+    gap: 16,
+  },
   windowRow: {
     flexDirection: 'row',
     gap: 12,
     flexWrap: 'wrap',
+  },
+  windowCustomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  windowCustomLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  windowInput: {
+    flexGrow: 1,
+    minWidth: 80,
+    borderWidth: 1,
+    borderColor: '#cbd5f5',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    color: '#0f172a',
+    backgroundColor: '#ffffff',
+  },
+  windowApplyButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#0f172a',
+  },
+  windowApplyButtonDisabled: {
+    backgroundColor: '#94a3b8',
+  },
+  windowApplyButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
   },
   windowMeta: {
     marginTop: 8,
