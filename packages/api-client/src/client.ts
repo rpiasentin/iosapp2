@@ -12,6 +12,10 @@ import {
   HistoryCustomResponse,
   VrmCodesResponse,
   VrmInstancesResponse,
+  VrmDefaultsResponse,
+  VrmDescriptionsResponse,
+  VrmSamplesMetaResponse,
+  VrmOverrideDefaultResponse,
 } from "./types";
 import { resolveBaseUrl, BaseUrlOptions } from "./config";
 
@@ -230,6 +234,60 @@ export class ApiClient {
     });
   }
 
+  /** GET /api/victron/history/defaults */
+  public getVrmHistoryDefaults(
+    options?: RequestOverrides
+  ): Promise<VrmDefaultsResponse> {
+    return this.request<VrmDefaultsResponse>(
+      "/api/victron/history/defaults",
+      options
+    );
+  }
+
+  /** GET /api/victron/history/descriptions */
+  public getVrmHistoryDescriptions(
+    options?: RequestOverrides
+  ): Promise<VrmDescriptionsResponse> {
+    return this.request<VrmDescriptionsResponse>(
+      "/api/victron/history/descriptions",
+      options
+    );
+  }
+
+  /** GET /api/victron/samples/meta */
+  public getVrmSamplesMeta(
+    options?: RequestOverrides
+  ): Promise<VrmSamplesMetaResponse> {
+    return this.request<VrmSamplesMetaResponse>(
+      "/api/victron/samples/meta",
+      options
+    );
+  }
+
+  /** POST /api/victron/history/override-default */
+  public overrideVrmHistoryDefault(
+    side: "left" | "right",
+    code: string,
+    options: RequestOverrides & { instance?: number } = {}
+  ): Promise<VrmOverrideDefaultResponse> {
+    const { instance, headers, ...rest } = options;
+    return httpRequest<VrmOverrideDefaultResponse>(
+      this.baseUrl,
+      "/api/victron/history/override-default",
+      this.fetchFn,
+      {
+        ...rest,
+        method: "POST",
+        body: {
+          side,
+          code,
+          ...(typeof instance === "number" ? { inst: instance } : {}),
+        },
+        headers: mergeHeaders(this.defaultHeaders, headers),
+      }
+    );
+  }
+
   /** Basic helper to validate connectivity; throws if the endpoint is unreachable. */
   public async ping(): Promise<HealthResponse> {
     try {
@@ -249,4 +307,3 @@ export class ApiClient {
 export function createApiClient(options?: ApiClientOptions): ApiClient {
   return new ApiClient(options);
 }
-

@@ -134,3 +134,17 @@ All commands in this section run from the macOS **Terminal** application.
 | Type checker fails | Fix TypeScript errors reported by `npm run typecheck --workspace @inverter/mobile`. |
 
 Keep this document updated as new tooling or scripts are added to the project. It should remain the single source of truth for reproducing the mobile test environment on any VS Code-equipped Mac.
+
+## Backend Setup Checklist
+
+Use the in-app **Setup** screen (Navigation → Setup) to validate that the FastAPI backend is ready. Each card links directly to the web forms so you can complete configuration from Safari/Chrome if required:
+
+1. **EG4 credentials** – tap **Open Setup Form** (or visit `http://localhost:8000/setup`) to save the EG4 username, password, and base URL.
+2. **Select inverter** – choose the active serial under **Open Inverter Selector** (`http://localhost:8000/inverters`) after login succeeds.
+3. **Verify samples** – confirm the collector is ingesting data in `/diagnostics`; the card highlights the last timestamp and total count.
+4. **Victron VRM (optional)** – use **Open Victron Login** and **Manage Installations** to authorise the VRM token and pick a site when combined dashboards are needed.
+5. **Scheduler status** – review outstanding jobs and the latest tick; the button jumps to `/nav` for the full snapshot.
+
+The Setup screen also links back to this guide and the README so you can revisit workstation bootstrapping steps without leaving Expo.
+
+Once Victron is linked, open the **VRM Dashboard** tile in the Navigation screen to adjust the left/right metric defaults and view the same dual-series chart that ships with the web app.

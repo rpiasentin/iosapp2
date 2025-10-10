@@ -81,6 +81,35 @@ export interface VrmCodesResponse {
   readonly codes: ReadonlyArray<string>;
 }
 
+export interface VrmDefaultSelection {
+  readonly instance?: number | null;
+  readonly code?: string | null;
+  readonly label?: string | null;
+  readonly unit?: string | null;
+}
+
+export interface VrmDefaultsResponse {
+  readonly left?: VrmDefaultSelection | null;
+  readonly right?: VrmDefaultSelection | null;
+}
+
+export interface VrmDescriptionsResponse {
+  readonly [code: string]: string;
+}
+
+export interface VrmSamplesMetaResponse {
+  readonly count: number;
+  readonly last_id: number | null;
+  readonly last_ts: string | null;
+}
+
+export interface VrmOverrideDefaultResponse {
+  readonly ok: boolean;
+  readonly side: string;
+  readonly code: string;
+  readonly inst: number;
+}
+
 export interface VrmInstanceItem {
   readonly instance: number;
   readonly idDeviceType?: number | string | null;

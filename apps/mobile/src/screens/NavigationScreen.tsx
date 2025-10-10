@@ -17,6 +17,8 @@ export interface NavigationScreenProps {
   readonly baseUrl: string;
   readonly onOpenDashboard: () => void;
   readonly onOpenCombinedMath: () => void;
+  readonly onOpenSetup: () => void;
+  readonly onOpenVrmDashboard: () => void;
   readonly onShowPlaceholder: (options: { title: string; description?: string; link?: string }) => void;
 }
 
@@ -33,7 +35,14 @@ function healthTone(ageSeconds: number | null | undefined): 'neutral' | 'success
   return 'danger';
 }
 
-export function NavigationScreen({ baseUrl, onOpenDashboard, onOpenCombinedMath, onShowPlaceholder }: NavigationScreenProps) {
+export function NavigationScreen({
+  baseUrl,
+  onOpenDashboard,
+  onOpenCombinedMath,
+  onOpenSetup,
+  onOpenVrmDashboard,
+  onShowPlaceholder,
+}: NavigationScreenProps) {
   const { state, refresh } = useSystemStatus(baseUrl);
   const statusData = state.status === 'ready' || (state.status === 'error' && state.data) ? state.data : null;
 
@@ -51,6 +60,41 @@ export function NavigationScreen({ baseUrl, onOpenDashboard, onOpenCombinedMath,
       return 'warning';
     }
     return 'neutral';
+  }, [statusData]);
+
+  const setupStatus = useMemo(() => {
+    if (!statusData) {
+      return { label: 'Review', tone: 'neutral' as const };
+    }
+    const credentials = Boolean(statusData.health.base_url);
+    const serial = Boolean(statusData.health.serial);
+    const hasSamples = (statusData.health.samples?.count ?? 0) > 0;
+    if (statusData.alerts.eg4_settings_failed) {
+      return { label: 'Attention', tone: 'danger' as const };
+    }
+    if (credentials && serial && hasSamples) {
+      return { label: 'Ready', tone: 'success' as const };
+    }
+    if (credentials || serial || hasSamples) {
+      return { label: 'In Progress', tone: 'warning' as const };
+    }
+    return { label: 'Start', tone: 'warning' as const };
+  }, [statusData]);
+
+  const vrmStatus = useMemo(() => {
+    if (!statusData) {
+      return { label: 'Review', tone: 'neutral' as const };
+    }
+    if (statusData.alerts.vrm_settings_failed) {
+      return { label: 'Attention', tone: 'danger' as const };
+    }
+    if (!statusData.vrm.configured) {
+      return { label: 'Link', tone: 'warning' as const };
+    }
+    if ((statusData.vrm.samples?.count ?? 0) > 0) {
+      return { label: 'Ready', tone: 'success' as const };
+    }
+    return { label: 'Waiting', tone: 'warning' as const };
   }, [statusData]);
 
   const openExternal = useCallback(
@@ -152,15 +196,13 @@ export function NavigationScreen({ baseUrl, onOpenDashboard, onOpenCombinedMath,
           </Pressable>
           <Pressable
             style={styles.navItem}
-            onPress={() =>
-              onShowPlaceholder({
-                title: 'VRM Dashboard',
-                description: 'Mobile dashboard for Victron VRM is in progress. Use the web app for full charts today.',
-              })
-            }
+            onPress={onOpenVrmDashboard}
             accessibilityRole="button"
           >
-            <Text style={styles.navItemTitle}>VRM Dashboard</Text>
+            <View style={styles.navItemHeader}>
+              <Text style={styles.navItemTitle}>VRM Dashboard</Text>
+              <StatusPill label={vrmStatus.label} tone={vrmStatus.tone} />
+            </View>
             <Text style={styles.navItemSubtitle}>Historical Victron data and alias views.</Text>
           </Pressable>
           <Pressable
@@ -191,15 +233,13 @@ export function NavigationScreen({ baseUrl, onOpenDashboard, onOpenCombinedMath,
         <Card>
           <Pressable
             style={styles.navItem}
-            onPress={() =>
-              onShowPlaceholder({
-                title: 'Setup',
-                description: 'Credential setup UI is planned for a future release.',
-              })
-            }
+            onPress={onOpenSetup}
             accessibilityRole="button"
           >
-            <Text style={styles.navItemTitle}>Setup</Text>
+            <View style={styles.navItemHeader}>
+              <Text style={styles.navItemTitle}>Setup</Text>
+              <StatusPill label={setupStatus.label} tone={setupStatus.tone} />
+            </View>
             <Text style={styles.navItemSubtitle}>Manage EG4 credentials and defaults.</Text>
           </Pressable>
           <Pressable
@@ -433,6 +473,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e2e8f0',
+    gap: 4,
+  },
+  navItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   navItemTitle: {
     fontSize: 16,

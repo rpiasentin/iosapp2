@@ -10,6 +10,8 @@ This Expo-managed React Native workspace hosts the inverter mobile client alongs
 ## Current Feature Set
 
 - **Navigation hub** replicates `/nav` from the web UI with live status badges for EG4, VRM, and scheduler endpoints.
+- **Setup checklist** guides onboarding by surfacing EG4 credentials, inverter selection, VRM linking, and scheduler health from the mobile app.
+- **VRM dashboard** mirrors the web selectors for Victron metrics with dual-series charting and default persistence.
 - **Dashboard screen** renders health, alerts, power metrics, energy totals, scheduler events, and PV history using shared components.
 - **Combined Math editor** lets users configure up to four KPIs across EG4/VRM plus a calculated sum column, adjust scaling per series, and preview data with a new `LineChart` component.
 - **Full-screen graph** – tapping the chart opens a modal that honours safe areas (no overlap with camera islands) and exposes Portrait/Landscape orientation toggles via `expo-screen-orientation`.
@@ -47,3 +49,29 @@ npm run dev:start
 ```
 
 Use `vscodetestreadme.md` for the full VS Code setup, simulator tips, and troubleshooting notes.
+
+## Setup Checklist
+
+Open **Setup** from the Navigation hub in the Expo app to confirm that the backend is ready before exploring dashboards. The checklist includes:
+
+1. **Connect EG4 account** – launches `/setup` so you can store credentials and the monitoring base URL.
+2. **Select primary inverter** – opens `/inverters` to set the active serial once login succeeds.
+3. **Verify data ingestion** – links to `/diagnostics` for sample counts and freshness checks.
+4. **Link Victron VRM (optional)** – deep links to `/victron/login` and `/victron/installations` for token and site selection.
+5. **Scheduler status** – surfaces queue length, last tick, and the most recent error alongside a shortcut back to `/nav`.
+
+Each card also exposes quick links to the README and VS Code guide so you can reference the workstation and backend setup steps without leaving the app.
+
+After the Victron token and installation are configured, open **VRM Dashboard** from the Navigation hub to trend two metrics side-by-side and adjust the saved defaults used by the backend aliases.
+
+### Freeing a Busy Backend Port
+
+If `npm run api:web` reports "Address already in use" (usually when a previous Uvicorn session is still running), free the port before restarting the stack:
+
+```bash
+lsof -nP -iTCP:8000 | grep LISTEN   # find the PID holding the port
+kill <pid>                          # stop it cleanly
+# or force if it refuses: kill -9 <pid>
+```
+
+Re-run `npm run api:web` once the process exits. Adjust the port in `EXPO_PUBLIC_API_BASE_URL` if you intentionally run the backend on a different port.

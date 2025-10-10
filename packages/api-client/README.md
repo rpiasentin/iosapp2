@@ -33,6 +33,10 @@ When running inside the Expo mobile app you can omit `baseUrl` and instead suppl
 - `getVrmInstances()` → `/api/victron/devices/instances`
 - `getVrmInstanceCodes(instance)` → `/api/victron/devices/instance-codes`
 - `getVrmHistoryByCode(params)` → `/api/victron/history/custom-by-code`
+- `getVrmHistoryDefaults()` → `/api/victron/history/defaults`
+- `getVrmHistoryDescriptions()` → `/api/victron/history/descriptions`
+- `getVrmSamplesMeta()` → `/api/victron/samples/meta`
+- `overrideVrmHistoryDefault(side, code, options?)` → `/api/victron/history/override-default`
 - `ping()` shortcut that wraps `getHealth()` with consistent error handling
 
 Each call returns typed data defined in `src/types.ts`. Additional endpoints can be layered on incrementally using the internal `request` helper.
