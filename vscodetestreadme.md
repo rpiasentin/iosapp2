@@ -145,6 +145,8 @@ Use the in-app **Setup** screen (Navigation → Setup) to validate that the Fast
 4. **Victron VRM (optional)** – use **Open Victron Login** and **Manage Installations** to authorise the VRM token and pick a site when combined dashboards are needed.
 5. **Scheduler status** – review outstanding jobs and the latest tick; the button jumps to `/nav` for the full snapshot.
 
+You can now open **Scheduler Console** from the Navigation screen to enqueue new applies without leaving the mobile app. The form mirrors the FastAPI `/schedule` workflow and hands scheduling off to the backend service.
+
 The Setup screen also links back to this guide and the README so you can revisit workstation bootstrapping steps without leaving Expo.
 
 Once Victron is linked, open the **VRM Dashboard** tile in the Navigation screen to adjust the left/right metric defaults and view the same dual-series chart that ships with the web app.

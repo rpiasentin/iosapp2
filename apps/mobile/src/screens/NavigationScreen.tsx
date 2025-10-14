@@ -19,6 +19,7 @@ export interface NavigationScreenProps {
   readonly onOpenCombinedMath: () => void;
   readonly onOpenSetup: () => void;
   readonly onOpenVrmDashboard: () => void;
+  readonly onOpenScheduler: () => void;
   readonly onShowPlaceholder: (options: { title: string; description?: string; link?: string }) => void;
 }
 
@@ -41,6 +42,7 @@ export function NavigationScreen({
   onOpenCombinedMath,
   onOpenSetup,
   onOpenVrmDashboard,
+  onOpenScheduler,
   onShowPlaceholder,
 }: NavigationScreenProps) {
   const { state, refresh } = useSystemStatus(baseUrl);
@@ -321,16 +323,11 @@ export function NavigationScreen({
           </View>
           <Pressable
             style={styles.navItem}
-            onPress={() =>
-              onShowPlaceholder({
-                title: 'Scheduler',
-                description: 'Scheduler management UI will surface once apply flows land on mobile.',
-              })
-            }
+            onPress={onOpenScheduler}
             accessibilityRole="button"
           >
             <Text style={styles.navItemTitle}>Scheduler Console</Text>
-            <Text style={styles.navItemSubtitle}>Monitor jobs, retries, and errors.</Text>
+            <Text style={styles.navItemSubtitle}>Queue upcoming applies and inspect recent events.</Text>
           </Pressable>
         </Card>
       </Section>

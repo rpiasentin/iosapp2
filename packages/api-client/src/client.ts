@@ -7,6 +7,7 @@ import {
   PvHistoryResponse,
   SchedulerEventsResponse,
   SchedulerStatusResponse,
+  ScheduleChangeRequest,
   VrmHealthResponse,
   HistoryKeysResponse,
   HistoryCustomResponse,
@@ -159,6 +160,72 @@ export class ApiClient {
         ...(options?.query ?? {}),
         limit,
       },
+    });
+  }
+
+  /** POST /schedule */
+  public async scheduleChange(
+    input: ScheduleChangeRequest,
+    options?: RequestOverrides
+  ): Promise<void> {
+    const {
+      source = "eg4",
+      mode,
+      day,
+      hour,
+      minute,
+      delayHours,
+      delayMinutes,
+      key,
+      value,
+    } = input;
+
+    const clampInt = (val: number, min: number, max: number) =>
+      Math.min(max, Math.max(min, Math.round(val)));
+
+    const toSafeInt = (val: number | undefined, fallback: number) =>
+      typeof val === "number" && Number.isFinite(val) ? val : fallback;
+
+    const form = new URLSearchParams();
+    form.set("source", source);
+    form.set("mode", mode);
+    form.set("key", key ?? "");
+    form.set("value", value ?? "");
+
+    const safeDelayHours = clampInt(toSafeInt(delayHours, 0), 0, 48);
+    const safeDelayMinutes = clampInt(toSafeInt(delayMinutes, 0), 0, 59);
+
+    form.set("delay_hours", String(safeDelayHours));
+    form.set("delay_minutes", String(safeDelayMinutes));
+
+    if (mode === "absolute") {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const safeDay = (day ?? todayIso).trim() || todayIso;
+      const safeHour = clampInt(toSafeInt(hour, 0), 0, 23);
+      const safeMinute = clampInt(toSafeInt(minute, 0), 0, 59);
+      form.set("day", safeDay);
+      form.set("hour", String(safeHour));
+      form.set("minute", String(safeMinute));
+    } else {
+      // Timer mode ignores absolute fields but we keep them present for compatibility.
+      form.set("day", (day ?? "").trim());
+      form.set("hour", String(clampInt(toSafeInt(hour, 0), 0, 23)));
+      form.set("minute", String(clampInt(toSafeInt(minute, 0), 0, 59)));
+    }
+
+    const { headers, ...rest } = options ?? {};
+    const merged = mergeHeaders(this.defaultHeaders, headers);
+    const requestHeaders = {
+      ...(merged ?? {}),
+      Accept: "text/html,application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+
+    await httpRequest<string>(this.baseUrl, "/schedule", this.fetchFn, {
+      ...rest,
+      method: "POST",
+      body: form.toString(),
+      headers: requestHeaders,
     });
   }
 

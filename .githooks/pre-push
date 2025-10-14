@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BACKEND_DIR="../inverter-app-api-start"
+
+if [ ! -d "$BACKEND_DIR/.git" ]; then
+  echo "[pre-push] Skipping backend sync check – expected repo at $BACKEND_DIR" >&2
+  exit 0
+fi
+
+if [ -n "$(git -C "$BACKEND_DIR" status --porcelain)" ]; then
+  echo "[pre-push] Backend repo has uncommitted changes. Commit or stash them in $BACKEND_DIR." >&2
+  exit 1
+fi
+
+# Ensure we have the latest remote refs
+if ! git -C "$BACKEND_DIR" fetch --quiet; then
+  echo "[pre-push] Failed to fetch remote for backend repo. Check network access or remote config." >&2
+  exit 1
+fi
+
+# Verify HEAD tracks an upstream
+if ! upstream_ref=$(git -C "$BACKEND_DIR" rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null); then
+  echo "[pre-push] Backend repo HEAD has no upstream. Set an upstream (e.g. git -C $BACKEND_DIR push -u origin main) before pushing here." >&2
+  exit 1
+fi
+
+local_sha=$(git -C "$BACKEND_DIR" rev-parse HEAD)
+remote_sha=$(git -C "$BACKEND_DIR" rev-parse "$upstream_ref")
+
+if [ "$local_sha" != "$remote_sha" ]; then
+  echo "[pre-push] Backend repo is not up to date with $upstream_ref." >&2
+  git -C "$BACKEND_DIR" --no-pager status -sb >&2
+  echo "Run 'git -C $BACKEND_DIR pull --ff-only' to sync before pushing iosapp2." >&2
+  exit 1
+fi
+
+exit 0

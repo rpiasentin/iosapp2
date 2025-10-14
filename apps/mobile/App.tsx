@@ -8,6 +8,7 @@ import { PlaceholderScreen } from './src/screens/PlaceholderScreen';
 import { CombinedMathScreen } from './src/screens/CombinedMathScreen';
 import { SetupScreen } from './src/screens/SetupScreen';
 import { VrmDashboardScreen } from './src/screens/VrmDashboardScreen';
+import { SchedulerScreen } from './src/screens/SchedulerScreen';
 
 const REQUIRED_BASE_URL_MESSAGE =
   'Missing EXPO_PUBLIC_API_BASE_URL. Add it to app config or .env before running the app.';
@@ -18,6 +19,7 @@ type ActiveScreen =
   | { type: 'combinedMath' }
   | { type: 'setup' }
   | { type: 'vrmDashboard' }
+  | { type: 'scheduler' }
   | { type: 'placeholder'; title: string; description?: string; link?: string };
 
 export default function App() {
@@ -35,6 +37,7 @@ export default function App() {
   const handleOpenCombinedMath = () => setActive({ type: 'combinedMath' });
   const handleOpenSetup = () => setActive({ type: 'setup' });
   const handleOpenVrmDashboard = () => setActive({ type: 'vrmDashboard' });
+  const handleOpenScheduler = () => setActive({ type: 'scheduler' });
   const handleBackToNav = () => setActive({ type: 'nav' });
   const handlePlaceholder = (options: { title: string; description?: string; link?: string }) =>
     setActive({ type: 'placeholder', ...options });
@@ -57,6 +60,7 @@ export default function App() {
             onOpenCombinedMath={handleOpenCombinedMath}
             onOpenSetup={handleOpenSetup}
             onOpenVrmDashboard={handleOpenVrmDashboard}
+            onOpenScheduler={handleOpenScheduler}
             onShowPlaceholder={handlePlaceholder}
           />
         ) : null}
@@ -71,6 +75,9 @@ export default function App() {
         ) : null}
         {active.type === 'vrmDashboard' ? (
           <VrmDashboardScreen baseUrl={baseUrl} onBack={handleBackToNav} />
+        ) : null}
+        {active.type === 'scheduler' ? (
+          <SchedulerScreen baseUrl={baseUrl} onBack={handleBackToNav} onOpenLink={openLink} />
         ) : null}
         {active.type === 'placeholder' ? (
           <PlaceholderScreen

@@ -54,6 +54,20 @@ export interface SchedulerEventsResponse {
   readonly events: ReadonlyArray<SchedulerEvent>;
 }
 
+export type SchedulerScheduleMode = "absolute" | "timer";
+
+export interface ScheduleChangeRequest {
+  readonly source?: string;
+  readonly mode: SchedulerScheduleMode;
+  readonly day?: string;
+  readonly hour?: number;
+  readonly minute?: number;
+  readonly delayHours?: number;
+  readonly delayMinutes?: number;
+  readonly key: string;
+  readonly value: string;
+}
+
 export interface VrmHealthResponse {
   readonly configured: boolean;
   readonly system_id?: string | null;
