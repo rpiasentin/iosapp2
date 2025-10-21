@@ -15,7 +15,7 @@ This Expo-managed React Native workspace hosts the inverter mobile client alongs
 - **Dashboard screen** renders health, alerts, power metrics, energy totals, scheduler events, and PV history using shared components.
 - **Combined Math editor** lets users configure up to four KPIs across EG4/VRM plus a calculated sum column, adjust scaling per series, and preview data with a new `LineChart` component.
 - **Full-screen graph** – tapping the chart opens a modal that honours safe areas (no overlap with camera islands) and exposes Portrait/Landscape orientation toggles via `expo-screen-orientation`.
-- **Scheduler console** surfaces queue health, event history, and a mobile-friendly form to enqueue new setting applies via the backend scheduler.
+- **Scheduler console** surfaces queue health, event history, and a mobile-friendly form to enqueue new setting applies via the backend scheduler (now with settings catalog auto-suggest).
 - **Shared formatting** utilities normalise numeric and temporal values for consistent rendering across cards and charts.
 - **Start script preflight** runs `npx expo install --check`, TypeScript checks for both workspaces, and backend availability checks before starting Metro. Use `npm run dev:start:all` to perform the preflight, auto-start the sibling FastAPI repo when it's available, and then launch Metro.
 - **Git guardrails** include a pre-push hook that blocks publishing if the sibling FastAPI repo (`../inverter-app-api-start`) is dirty or not synced with its upstream. Run `git config core.hooksPath .githooks` once after cloning to activate it.

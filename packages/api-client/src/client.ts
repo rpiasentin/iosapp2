@@ -17,6 +17,7 @@ import {
   VrmDescriptionsResponse,
   VrmSamplesMetaResponse,
   VrmOverrideDefaultResponse,
+  SettingsCatalogResponse,
 } from "./types";
 import { resolveBaseUrl, BaseUrlOptions } from "./config";
 
@@ -161,6 +162,16 @@ export class ApiClient {
         limit,
       },
     });
+  }
+
+  /** GET /api/settings/catalog */
+  public getSettingsCatalog(
+    options?: RequestOverrides
+  ): Promise<SettingsCatalogResponse> {
+    return this.request<SettingsCatalogResponse>(
+      "/api/settings/catalog",
+      options
+    );
   }
 
   /** POST /schedule */

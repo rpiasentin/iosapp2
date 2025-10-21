@@ -154,3 +154,12 @@ export interface ChangeLogResponse {
 export interface ApiListResponse<TItem> {
   readonly items: ReadonlyArray<TItem>;
 }
+
+export interface SettingsCatalogItem {
+  readonly key: string;
+  readonly value?: string | null;
+  readonly category?: string | null;
+}
+
+export interface SettingsCatalogResponse
+  extends ApiListResponse<SettingsCatalogItem> {}

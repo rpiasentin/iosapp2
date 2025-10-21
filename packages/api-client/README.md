@@ -26,6 +26,7 @@ When running inside the Expo mobile app you can omit `baseUrl` and instead suppl
 - `getAlerts()` → `/api/alerts`
 - `getSchedulerStatus()` → `/api/scheduler/status`
 - `getSchedulerEvents(limit?)` → `/api/scheduler/events`
+- `getSettingsCatalog()` → `/api/settings/catalog`
 - `scheduleChange(payload, options?)` → `POST /schedule`
 - `getHistoryKeys()` → `/api/history/keys`
 - `getHistoryCustom(params)` → `/api/history/custom`

@@ -15,10 +15,12 @@ import { Card, KeyValueRow, Section, StatusPill } from '@inverter/ui';
 import {
   ApiError,
   SchedulerScheduleMode,
+  SettingsCatalogItem,
   createApiClient,
 } from '@inverter/api-client';
 
 import { useSchedulerFeed } from '../hooks/useSchedulerFeed';
+import { useSettingsCatalog } from '../hooks/useSettingsCatalog';
 import {
   formatDateTime,
   formatNumber,
@@ -87,6 +89,15 @@ function getErrorMessage(error: unknown): string {
 export function SchedulerScreen({ baseUrl, onBack, onOpenLink }: SchedulerScreenProps) {
   const api = useMemo(() => createApiClient({ baseUrl }), [baseUrl]);
   const { status, data, error, refreshing, refresh } = useSchedulerFeed(baseUrl);
+  const {
+    status: catalogStatus,
+    items: catalogItems,
+    error: catalogError,
+    refreshing: catalogRefreshing,
+    refresh: refreshCatalog,
+  } = useSettingsCatalog(baseUrl);
+
+  const [showCatalog, setShowCatalog] = useState(false);
 
   const initialLoading = status === 'loading' && !data;
 
@@ -104,6 +115,83 @@ export function SchedulerScreen({ baseUrl, onBack, onOpenLink }: SchedulerScreen
     error: null,
     success: null,
   });
+
+  const rawKeyQuery = settingKey.trim();
+  const normalizedKeyQuery = rawKeyQuery.toLowerCase();
+  const suggestionLimit = showCatalog ? 20 : 8;
+  const truncatedKeyQuery =
+    rawKeyQuery.length > 40 ? `${rawKeyQuery.slice(0, 37)}...` : rawKeyQuery;
+
+  const suggestions = useMemo(() => {
+    if (catalogItems.length === 0) {
+      return [] as SettingsCatalogItem[];
+    }
+    if (!normalizedKeyQuery) {
+      const essentials = catalogItems.filter((item) => item.category === 'Essentials');
+      const others = catalogItems.filter((item) => item.category !== 'Essentials');
+      return [...essentials, ...others].slice(0, suggestionLimit);
+    }
+    const scored = catalogItems
+      .map((item) => {
+        const keyLower = item.key.toLowerCase();
+        const categoryLower = (item.category ?? '').toLowerCase();
+        const valueLower = (item.value ?? '').toLowerCase();
+        let score = 0;
+        if (keyLower.startsWith(normalizedKeyQuery)) {
+          score += 4;
+        } else if (keyLower.includes(normalizedKeyQuery)) {
+          score += 3;
+        }
+        if (categoryLower.includes(normalizedKeyQuery)) {
+          score += 1;
+        }
+        if (valueLower.includes(normalizedKeyQuery)) {
+          score += 1;
+        }
+        if ((item.category ?? '') === 'Essentials') {
+          score += 0.5;
+        }
+        return { item, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return a.item.key.localeCompare(b.item.key);
+      })
+      .map(({ item }) => item);
+
+    if (scored.length === 0 && showCatalog) {
+      return catalogItems.slice(0, suggestionLimit);
+    }
+
+    return scored.slice(0, suggestionLimit);
+  }, [catalogItems, normalizedKeyQuery, showCatalog, suggestionLimit]);
+
+  const showCatalogPanel = showCatalog || rawKeyQuery.length >= 1;
+  const isCatalogLoading = catalogStatus === 'loading' || catalogRefreshing;
+
+  const handleCatalogToggle = useCallback(() => {
+    setShowCatalog((prev) => {
+      const next = !prev;
+      if (!prev && catalogStatus === 'error') {
+        refreshCatalog();
+      }
+      return next;
+    });
+  }, [catalogStatus, refreshCatalog]);
+
+  const handleSelectSuggestion = useCallback(
+    (item: SettingsCatalogItem) => {
+      setSettingKey(item.key);
+      if (item.value !== undefined && item.value !== null) {
+        setSettingValue(item.value);
+      }
+      setShowCatalog(false);
+    },
+    [],
+  );
 
   const schedulerStatus = data?.status;
   const schedulerEvents = data?.events?.events ?? [];
@@ -356,7 +444,18 @@ export function SchedulerScreen({ baseUrl, onBack, onOpenLink }: SchedulerScreen
             )}
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.inputLabel}>Setting key</Text>
+              <View style={styles.fieldHeader}>
+                <Text style={styles.inputLabel}>Setting key</Text>
+                <Pressable
+                  style={styles.catalogToggle}
+                  onPress={handleCatalogToggle}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.catalogToggleLabel}>
+                    {showCatalog ? 'Hide catalog' : 'Browse catalog'}
+                  </Text>
+                </Pressable>
+              </View>
               <TextInput
                 value={settingKey}
                 onChangeText={setSettingKey}
@@ -365,6 +464,64 @@ export function SchedulerScreen({ baseUrl, onBack, onOpenLink }: SchedulerScreen
                 accessibilityLabel="Setting key"
                 autoCapitalize="none"
               />
+              {showCatalogPanel ? (
+                <View style={styles.catalogPanel}>
+                  {isCatalogLoading ? (
+                    <View style={styles.catalogMessageRow}>
+                      <ActivityIndicator size="small" color="#0f172a" />
+                      <Text style={styles.catalogMessageText}>Loading catalog...</Text>
+                    </View>
+                  ) : catalogStatus === 'error' ? (
+                    <View style={styles.catalogMessageRow}>
+                      <Text style={styles.catalogErrorText}>
+                        {catalogError ?? 'Unable to load settings catalog.'}
+                      </Text>
+                      <Pressable
+                        style={styles.catalogRetryButton}
+                        onPress={refreshCatalog}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.catalogRetryLabel}>Retry</Text>
+                      </Pressable>
+                    </View>
+                  ) : catalogItems.length === 0 ? (
+                    <Text style={styles.catalogEmptyText}>
+                      Scheduler suggestions appear after the backend records a settings snapshot.
+                    </Text>
+                  ) : suggestions.length === 0 ? (
+                    <Text style={styles.catalogEmptyText}>
+                      {`No matches for "${truncatedKeyQuery}".`}
+                    </Text>
+                  ) : (
+                    <>
+                      <Text style={styles.catalogHint}>Tap a suggestion to autofill key and value.</Text>
+                      <View style={styles.catalogList}>
+                        {suggestions.map((item) => {
+                          const previewRaw = item.value ?? '';
+                          const preview =
+                            previewRaw.length > 48
+                              ? `${previewRaw.slice(0, 45)}...`
+                              : previewRaw;
+                          return (
+                            <Pressable
+                              key={item.key}
+                              style={styles.catalogItem}
+                              onPress={() => handleSelectSuggestion(item)}
+                              accessibilityRole="button"
+                            >
+                              <Text style={styles.catalogItemKey}>{item.key}</Text>
+                              <Text style={styles.catalogItemMeta}>
+                                {item.category ?? 'Uncategorized'}
+                                {preview ? ` • ${preview}` : ''}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
+                </View>
+              ) : null}
             </View>
             <View style={styles.fieldGroup}>
               <Text style={styles.inputLabel}>Value</Text>
@@ -593,6 +750,12 @@ const styles = StyleSheet.create({
   fieldGroup: {
     gap: 6,
   },
+  fieldHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#cbd5f5',
@@ -605,6 +768,78 @@ const styles = StyleSheet.create({
   },
   valueInput: {
     minHeight: 80,
+  },
+  catalogToggle: {
+    backgroundColor: '#e2e8f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  catalogToggleLabel: {
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  catalogPanel: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#cbd5f5',
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    gap: 8,
+  },
+  catalogMessageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  catalogMessageText: {
+    color: '#334155',
+    flexShrink: 1,
+  },
+  catalogErrorText: {
+    color: '#b91c1c',
+    fontWeight: '600',
+    flex: 1,
+  },
+  catalogRetryButton: {
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  catalogRetryLabel: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  catalogEmptyText: {
+    color: '#475569',
+  },
+  catalogHint: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  catalogList: {
+    gap: 8,
+  },
+  catalogItem: {
+    borderWidth: 1,
+    borderColor: '#cbd5f5',
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  catalogItemKey: {
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  catalogItemMeta: {
+    color: '#475569',
+    fontSize: 12,
   },
   formError: {
     color: '#b91c1c',
