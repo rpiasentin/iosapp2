@@ -13,7 +13,7 @@ This Expo-managed React Native workspace hosts the inverter mobile client alongs
 - **Setup checklist** guides onboarding by surfacing EG4 credentials, inverter selection, VRM linking, and scheduler health from the mobile app.
 - **VRM dashboard** mirrors the web selectors for Victron metrics with dual-series charting and default persistence.
 - **Dashboard screen** renders health, alerts, power metrics, energy totals, scheduler events, and PV history using shared components.
-- **Combined Math editor** lets users configure up to four KPIs across EG4/VRM plus a calculated sum column, adjust scaling per series, and preview data with a new `LineChart` component.
+- **Combined Math editor** lets users configure up to four KPIs across EG4/VRM plus a calculated sum column, adjust scaling per series, preview data with a new `LineChart`, and persist selections via the backend so presets rehydrate automatically on load.
 - **Full-screen graph** – tapping the chart opens a modal that honours safe areas (no overlap with camera islands) and exposes Portrait/Landscape orientation toggles via `expo-screen-orientation`.
 - **Scheduler console** surfaces queue health, event history, and a mobile-friendly form to enqueue new setting applies via the backend scheduler (now with settings catalog auto-suggest).
 - **Shared formatting** utilities normalise numeric and temporal values for consistent rendering across cards and charts.
@@ -29,7 +29,6 @@ This Expo-managed React Native workspace hosts the inverter mobile client alongs
 
 ## Planned / Open Work
 
-- Persist combined math selections so users can save presets aligned with FastAPI combined metrics.
 - Port scheduler management, settings editor, and VRM dashboards from the web experience into native screens.
 - Add automated tests (unit and integration) around data-fetch hooks and chart series assembly.
 - Consider a dedicated context/store for shared API data (health, alerts) to reduce duplicate fetches as more screens come online.

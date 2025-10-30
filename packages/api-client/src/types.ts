@@ -163,3 +163,27 @@ export interface SettingsCatalogItem {
 
 export interface SettingsCatalogResponse
   extends ApiListResponse<SettingsCatalogItem> {}
+
+export type CombinedMathSource = "eg4" | "vrm";
+
+export interface CombinedMathColumn {
+  readonly source: CombinedMathSource;
+  readonly kpi?: string | null;
+  readonly instanceId?: number | null;
+  readonly scale?: string | null;
+}
+
+export interface CombinedMathStateResponse {
+  readonly version: number;
+  readonly columns: ReadonlyArray<CombinedMathColumn>;
+  readonly calcIncludes: ReadonlyArray<boolean>;
+  readonly windowHours: number;
+  readonly updatedAt?: string | null;
+}
+
+export interface CombinedMathStateSaveRequest {
+  readonly version?: number;
+  readonly columns: ReadonlyArray<CombinedMathColumn>;
+  readonly calcIncludes: ReadonlyArray<boolean>;
+  readonly windowHours: number;
+}

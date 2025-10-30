@@ -18,6 +18,8 @@ import {
   VrmSamplesMetaResponse,
   VrmOverrideDefaultResponse,
   SettingsCatalogResponse,
+  CombinedMathStateResponse,
+  CombinedMathStateSaveRequest,
 } from "./types";
 import { resolveBaseUrl, BaseUrlOptions } from "./config";
 
@@ -362,6 +364,39 @@ export class ApiClient {
           ...(typeof instance === "number" ? { inst: instance } : {}),
         },
         headers: mergeHeaders(this.defaultHeaders, headers),
+      }
+    );
+  }
+
+  /** GET /api/combined/math/state */
+  public getCombinedMathState(
+    options?: RequestOverrides
+  ): Promise<CombinedMathStateResponse> {
+    return this.request<CombinedMathStateResponse>(
+      "/api/combined/math/state",
+      options
+    );
+  }
+
+  /** POST /api/combined/math/state */
+  public saveCombinedMathState(
+    state: CombinedMathStateSaveRequest,
+    options?: RequestOverrides
+  ): Promise<CombinedMathStateResponse> {
+    const { headers, ...rest } = options ?? {};
+    return httpRequest<CombinedMathStateResponse>(
+      this.baseUrl,
+      "/api/combined/math/state",
+      this.fetchFn,
+      {
+        ...rest,
+        method: "POST",
+        body: JSON.stringify(state),
+        headers: mergeHeaders(this.defaultHeaders, {
+          "Content-Type": "application/json",
+          ...(headers ?? {}),
+        }),
+        timeoutMs: rest.timeoutMs ?? this.timeoutMs,
       }
     );
   }

@@ -15,6 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
   createApiClient,
+  CombinedMathStateResponse,
   HistoryCustomResponse,
   HistoryKeysResponse,
   VrmCodesResponse,
@@ -77,6 +78,8 @@ const DEFAULT_COLUMNS: ColumnSelection[] = [
   { source: 'vrm', instanceId: undefined, kpi: undefined, scale: '1' },
   { source: 'vrm', instanceId: undefined, kpi: undefined, scale: '1' },
 ];
+
+const DEFAULT_CALC_INCLUDES = [true, true, false, false] as const;
 
 function OptionModal({ state, onClose }: { state: ModalState | null; onClose: () => void }) {
   if (!state) {
@@ -279,7 +282,7 @@ function CalculatedColumn({
 export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps) {
   const api = useMemo(() => createApiClient({ baseUrl }), [baseUrl]);
   const [columns, setColumns] = useState<ColumnSelection[]>(DEFAULT_COLUMNS);
-  const [calcIncludes, setCalcIncludes] = useState<boolean[]>([true, true, false, false]);
+  const [calcIncludes, setCalcIncludes] = useState<boolean[]>(() => Array.from(DEFAULT_CALC_INCLUDES));
   const [windowHours, setWindowHours] = useState<number>(24);
   const [windowHoursInput, setWindowHoursInput] = useState<string>('24');
   const [eg4Keys, setEg4Keys] = useState<string[]>([]);
@@ -287,41 +290,111 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
   const [vrmInstances, setVrmInstances] = useState<VrmInstanceItem[]>([]);
   const [modalState, setModalState] = useState<ModalState | null>(null);
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'idle', series: [] });
+  const [initLoading, setInitLoading] = useState<boolean>(true);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [persistStatus, setPersistStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [persistError, setPersistError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [fullscreenVisible, setFullscreenVisible] = useState(false);
   const windowDimensions = useWindowDimensions();
 
-  const loadOptions = useCallback(async () => {
+  const loadInitialData = useCallback(async () => {
+    setInitLoading(true);
+    setInitError(null);
+    setPersistStatus('idle');
+    setPersistError(null);
     try {
-      const [eg4Res, vrmCodesRes, vrmInstancesRes]: [HistoryKeysResponse, VrmCodesResponse, VrmInstancesResponse] =
-        await Promise.all([
-          api.getHistoryKeys(),
-          api.getVrmHistoryCodes(),
-          api.getVrmInstances(),
-        ]);
-      setEg4Keys(Array.from(eg4Res.keys ?? []));
-      setVrmCodes(Array.from(vrmCodesRes.codes ?? []));
-      setVrmInstances(Array.from(vrmInstancesRes.items ?? []));
-      setColumns((prev) =>
-        prev.map((col, idx) => {
-          if (col.source === 'eg4' && !col.kpi && eg4Res.keys.length) {
-            return { ...col, kpi: eg4Res.keys[0] };
+      const [eg4Res, vrmCodesRes, vrmInstancesRes, state]: [
+        HistoryKeysResponse,
+        VrmCodesResponse,
+        VrmInstancesResponse,
+        CombinedMathStateResponse,
+      ] = await Promise.all([
+        api.getHistoryKeys(),
+        api.getVrmHistoryCodes(),
+        api.getVrmInstances(),
+        api.getCombinedMathState(),
+      ]);
+
+      const eg4List = Array.from(eg4Res.keys ?? []);
+      const vrmCodeList = Array.from(vrmCodesRes.codes ?? []);
+      const vrmItems = Array.from(vrmInstancesRes.items ?? []);
+
+      const savedColumns = Array.isArray(state.columns) ? state.columns : [];
+      const savedCalc = Array.isArray(state.calcIncludes) ? state.calcIncludes : [];
+      const savedWindow = typeof state.windowHours === 'number' ? state.windowHours : Number(state.windowHours ?? 0);
+
+      const savedVrmCodes = savedColumns
+        .filter((col) => col.source === 'vrm' && col.kpi)
+        .map((col) => String(col.kpi));
+      const mergedVrmCodes = Array.from(new Set<string>([...vrmCodeList, ...savedVrmCodes]));
+
+      const eg4KeySet = new Set(eg4List);
+      const vrmInstanceIds = new Set(vrmItems.map((item) => item.instance));
+      const vrmCodeSet = new Set(mergedVrmCodes);
+
+      const normalizedColumns: ColumnSelection[] = DEFAULT_COLUMNS.map((defaults, idx) => {
+        const saved = savedColumns[idx] ?? null;
+        const source: SourceType = saved && saved.source === 'vrm' ? 'vrm' : defaults.source;
+        const scaleRaw = saved && typeof saved.scale !== 'undefined' ? String(saved.scale ?? '').trim() : String(defaults.scale ?? '').trim();
+        const scale = scaleRaw || '1';
+
+        if (source === 'eg4') {
+          const savedKpi = saved && saved.kpi ? String(saved.kpi) : defaults.kpi;
+          const kpi = savedKpi && eg4KeySet.has(savedKpi) ? savedKpi : eg4List[0] ?? savedKpi ?? defaults.kpi;
+          return { source: 'eg4', kpi, scale, instanceId: undefined };
+        }
+
+        let instanceId: number | undefined = undefined;
+        if (saved && typeof saved.instanceId !== 'undefined' && saved.instanceId !== null) {
+          const parsed = Number.parseInt(String(saved.instanceId), 10);
+          if (Number.isFinite(parsed) && vrmInstanceIds.has(parsed)) {
+            instanceId = parsed;
           }
-          if (col.source === 'vrm') {
-            const inst = col.instanceId ?? vrmInstancesRes.items[0]?.instance;
-            const kpi = col.kpi ?? vrmCodesRes.codes[0];
-            return { ...col, instanceId: inst, kpi };
-          }
-          return col;
-        })
-      );
+        }
+        if (instanceId === undefined) {
+          instanceId = vrmItems[0]?.instance ?? undefined;
+        }
+
+        const savedKpi = saved && saved.kpi ? String(saved.kpi) : defaults.kpi;
+        const kpi = savedKpi && vrmCodeSet.has(savedKpi) ? savedKpi : mergedVrmCodes[0] ?? savedKpi ?? defaults.kpi;
+
+        return {
+          source: 'vrm',
+          instanceId,
+          kpi,
+          scale,
+        };
+      });
+
+      const normalizedCalc = Array.from(DEFAULT_CALC_INCLUDES).map((fallback, idx) => {
+        if (!savedCalc || idx >= savedCalc.length) {
+          return fallback;
+        }
+        return Boolean(savedCalc[idx]);
+      });
+
+      const normalizedWindow = Number.isFinite(savedWindow) && savedWindow > 0 ? savedWindow : 24;
+
+      setEg4Keys(eg4List);
+      setVrmCodes(mergedVrmCodes);
+      setVrmInstances(vrmItems);
+      setColumns(normalizedColumns);
+      setCalcIncludes(normalizedCalc);
+      setWindowHours(normalizedWindow);
+      setLastSavedAt(state.updatedAt ? new Date(state.updatedAt) : null);
+      setPersistStatus('idle');
+      setPersistError(null);
     } catch (error) {
-      setFetchState({ status: 'error', series: [], error: error instanceof Error ? error.message : String(error) });
+      setInitError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setInitLoading(false);
     }
   }, [api]);
 
   useEffect(() => {
-    loadOptions();
-  }, [loadOptions]);
+    loadInitialData();
+  }, [loadInitialData]);
 
   useEffect(() => {
     setWindowHoursInput(String(windowHours));
@@ -442,8 +515,8 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
   );
 
   const canPreview = useMemo(
-    () => columns.some((col) => Boolean(col.kpi)),
-    [columns]
+    () => !initLoading && columns.some((col) => Boolean(col.kpi)),
+    [columns, initLoading]
   );
 
   const previewGraph = useCallback(async () => {
@@ -558,9 +631,52 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
     }
   }, [api, calcIncludes, canPreview, columns, windowHours]);
 
+  const persistSelection = useCallback(async () => {
+    if (initLoading || persistStatus === 'saving') {
+      return;
+    }
+    setPersistStatus('saving');
+    setPersistError(null);
+    try {
+      const payload = {
+        version: 1,
+        columns: columns.map((column) => ({
+          source: column.source,
+          kpi: column.kpi ?? null,
+          scale: (column.scale ?? '').trim() ? (column.scale ?? '').trim() : '1',
+          instanceId: column.source === 'vrm' ? column.instanceId ?? null : null,
+        })),
+        calcIncludes: calcIncludes.map((value) => Boolean(value)),
+        windowHours,
+      };
+      const saved = await api.saveCombinedMathState(payload);
+      const updated = saved.updatedAt ? new Date(saved.updatedAt) : new Date();
+      setLastSavedAt(updated);
+      setPersistStatus('saved');
+    } catch (error) {
+      setPersistStatus('error');
+      setPersistError(error instanceof Error ? error.message : String(error));
+    }
+  }, [api, calcIncludes, columns, initLoading, persistStatus, windowHours]);
+
   const legendItems = useMemo(() => {
     return fetchState.series.map((s) => ({ id: s.id, name: s.name, color: s.color }));
   }, [fetchState.series]);
+
+  const savedRelative = useMemo(() => {
+    if (!lastSavedAt) {
+      return null;
+    }
+    return formatRelativeTime(lastSavedAt.toISOString());
+  }, [lastSavedAt]);
+
+  useEffect(() => {
+    if (persistStatus !== 'saved') {
+      return;
+    }
+    const timer = setTimeout(() => setPersistStatus('idle'), 2500);
+    return () => clearTimeout(timer);
+  }, [persistStatus]);
 
   const handleWindowInputChange = useCallback((value: string) => {
     const normalized = value.replace(/[^0-9]/g, '');
@@ -596,16 +712,66 @@ export function CombinedMathScreen({ baseUrl, onBack }: CombinedMathScreenProps)
     <View style={styles.screen}>
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
-          <View>
+          <View style={styles.headingBlock}>
             <Text style={styles.heading}>Combined Dashboard Math</Text>
             <Text style={styles.subheading}>
               Choose KPIs from EG4 and VRM, apply scaling, and preview a calculated sum.
             </Text>
+            {savedRelative ? <Text style={styles.savedMeta}>Saved {savedRelative}</Text> : null}
+            {initLoading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color="#0f172a" size="small" />
+                <Text style={styles.loadingMeta}>Loading saved configuration…</Text>
+              </View>
+            ) : null}
           </View>
-          <Pressable style={styles.headerButton} onPress={onBack} accessibilityRole="button">
-            <Text style={styles.headerButtonText}>Back</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={[
+                styles.saveButton,
+                (initLoading || persistStatus === 'saving') ? styles.saveButtonDisabled : null,
+              ]}
+              onPress={persistSelection}
+              disabled={initLoading || persistStatus === 'saving'}
+              accessibilityRole="button"
+            >
+              {persistStatus === 'saving' ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save</Text>
+              )}
+            </Pressable>
+            <Pressable style={styles.headerButton} onPress={onBack} accessibilityRole="button">
+              <Text style={styles.headerButtonText}>Back</Text>
+            </Pressable>
+          </View>
         </View>
+
+        {initError ? (
+          <View style={styles.inlineError}>
+            <Text style={styles.inlineErrorText}>Failed to load saved configuration: {initError}</Text>
+            <Pressable
+              style={styles.inlineErrorButton}
+              onPress={loadInitialData}
+              accessibilityRole="button"
+            >
+              <Text style={styles.inlineErrorAction}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {persistStatus === 'error' && persistError ? (
+          <View style={styles.inlineError}>
+            <Text style={styles.inlineErrorText}>Unable to save changes: {persistError}</Text>
+            <Pressable
+              style={styles.inlineErrorButton}
+              onPress={persistSelection}
+              accessibilityRole="button"
+            >
+              <Text style={styles.inlineErrorAction}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <ScrollView horizontal contentContainerStyle={styles.gridScroll}>
           <View style={styles.columnGrid}>
@@ -815,6 +981,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 16,
   },
+  headingBlock: {
+    flex: 1,
+    gap: 6,
+  },
   heading: {
     fontSize: 28,
     fontWeight: '700',
@@ -823,6 +993,40 @@ const styles = StyleSheet.create({
   subheading: {
     marginTop: 4,
     color: '#64748b',
+  },
+  savedMeta: {
+    color: '#475569',
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  loadingMeta: {
+    color: '#475569',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  saveButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: '#1d4ed8',
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    letterSpacing: 0.6,
   },
   headerButton: {
     paddingHorizontal: 16,
@@ -834,6 +1038,30 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
     letterSpacing: 0.6,
+  },
+  inlineError: {
+    backgroundColor: '#fee2e2',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  inlineErrorText: {
+    flex: 1,
+    color: '#b91c1c',
+  },
+  inlineErrorButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#b91c1c',
+  },
+  inlineErrorAction: {
+    color: '#ffffff',
+    fontWeight: '600',
   },
   gridScroll: {
     paddingBottom: 4,

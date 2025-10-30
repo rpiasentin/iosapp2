@@ -39,6 +39,8 @@ When running inside the Expo mobile app you can omit `baseUrl` and instead suppl
 - `getVrmHistoryDescriptions()` → `/api/victron/history/descriptions`
 - `getVrmSamplesMeta()` → `/api/victron/samples/meta`
 - `overrideVrmHistoryDefault(side, code, options?)` → `/api/victron/history/override-default`
+- `getCombinedMathState()` → `/api/combined/math/state`
+- `saveCombinedMathState(payload, options?)` → `POST /api/combined/math/state`
 - `ping()` shortcut that wraps `getHealth()` with consistent error handling
 
 Each call returns typed data defined in `src/types.ts`. Additional endpoints can be layered on incrementally using the internal `request` helper.
@@ -59,5 +61,6 @@ The combined dashboard math flow calls into the history helpers to mix EG4 and V
 - `HistoryCustomParams` lets you pull any EG4 key with optional limits or rolling windows.
 - `VrmHistoryParams` adds per-instance filtering (`linst`/`rinst`) so a mobile user can chart a specific MPPT or alias.
 - `VrmHistoryCodes`, `VrmInstances`, and `VrmInstanceCodes` power dropdowns that mirror the FastAPI `/combined/math` UI.
+- `getCombinedMathState` / `saveCombinedMathState` coordinate the persisted Combined Dashboard Math presets consumed by the Expo screen, keeping mobile and backend in sync.
 
 When onboarding additional backend endpoints, expose them through the same `request` helper so both Expo and web clients remain in lock-step with the FastAPI contract.
