@@ -1,0 +1,30 @@
+{
+  "editor.formatOnSave": true,
+
+  "files.exclude": {
+    "**/.git": true,
+    "**/node_modules": true,
+    "**/.expo": true
+  },
+
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.expo": true,
+    "**/dist": true
+  },
+
+  "eslint.workingDirectories": [
+    "./apps/mobile",
+    "./packages/api-client",
+    "./packages/ui"
+  ],
+
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "typescript.tsdk": "node_modules/typescript/lib"
+}
