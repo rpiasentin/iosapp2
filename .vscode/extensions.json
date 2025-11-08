@@ -5,6 +5,7 @@
     "msjsdiag.vscode-react-native",
     "mikestead.dotenv",
     "github.vscode-pull-request-github",
-    "eamodio.gitlens"
+    "eamodio.gitlens",
+    "openai.chatgpt"
   ]
 }
